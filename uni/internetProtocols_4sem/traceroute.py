@@ -2,19 +2,23 @@ import socket
 import struct
 import os
 import time
+import re
 import random
 from dataclasses import dataclass
+from ipaddress import ip_address
 import argparse
 
 ICMP_ECHO_REQUEST = 8
+WHOIS_SERVERS = ['whois.ripe.net', 'whois.arin.net', 'whois.apnic.net', 'whois.afrinic.net', 'whois.lacnic.net',
+                 'whois.internic.net', 'whois.iana.org']
 
 
 @dataclass
-class IcmpPacket:
+class IcmpPack:
     packet_type: int
     code: int
 
-    def checksum(self, data) -> int:
+    def checksum(self, data):
         csum = 0
         countTo = (len(data) // 2) * 2
 
@@ -52,8 +56,8 @@ class IcmpPacket:
         return packet
 
     @staticmethod
-    def from_bytes(data: bytes) -> 'IcmpPacket':
-        return IcmpPacket(*struct.unpack('BB', data[:2]))
+    def from_bytes(data: bytes):
+        return IcmpPack(*struct.unpack('BB', data[:2]))
 
     def is_echo_reply(self):
         return self.code == self.packet_type == 0
@@ -70,14 +74,14 @@ class TraceResult:
 
     @staticmethod
     def from_whois_data(destination, num, data):
-        is_local = data is None
+        is_local = data is None or 'EU' in data.get('country', '')
         country = data.get('country', '') if not is_local else ''
         country = country if country.lower() != 'eu' else ''
         as_zone = data.get('origin', '') if not is_local else ''
         netname = data.get('netname', '') if not is_local else ''
         return TraceResult(destination, num, netname, as_zone, country, is_local)
 
-    def __str__(self) -> str:
+    def __str__(self):
         result = f'{self.num}. {self.destination}\r\n'
         if self.is_local:
             return result + 'local\r\n'
@@ -91,48 +95,59 @@ class TraceResult:
         return result + ', '.join(info) + '\r\n'
 
 
-def get_whois_iana_data(addr):
+def query_whois_servers(addr):
+    if ip_address(addr).is_private:
+        return ''
+
+    for server in WHOIS_SERVERS:
+        res = query_server(server, addr)
+        if res:
+            return res
+        else:
+            continue
+    return ''
+
+
+def query_server(server, addr):
+    print('query ' + server + ' on ' + addr)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as whois_sock:
-        whois_sock.settimeout(1)
-        whois_sock.connect((socket.gethostbyname('whois.iana.org'), 43))
+        whois_sock.settimeout(5)
+        whois_sock.connect((socket.gethostbyname(server), 43))
         whois_sock.send(addr.encode(encoding='utf-8') + b'\r\n')
         try:
-            iana_info = whois_sock.recv(1024).decode()
-            whois_addr_start = iana_info.index('whois')
-            whois_addr_end = iana_info.index('\n', whois_addr_start)
-            return iana_info[whois_addr_start:whois_addr_end].replace(' ', '')
-        except (socket.timeout, ValueError, socket.gaierror):
+            data = bytearray()
+            while True:
+                temp_data = whois_sock.recv(1024)
+                if not temp_data:
+                    break
+                data.extend(temp_data)
+
+            decoded = data.decode()
+            if 'No match' in decoded or 'block not managed by' in decoded:
+                return ''
+            else:
+                return decoded
+        except (socket.timeout, UnicodeDecodeError, ValueError, socket.gaierror):
             return ''
 
 
 def get_whois_data(addr: str):
-    whois_addr = get_whois_iana_data(addr)
+    data = query_whois_servers(addr)
+
+    if not data:
+        return {}
+
     whois_data = {}
-    if not whois_addr:
-        return
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as whois_sock:
-        whois_sock.settimeout(2)
-        whois_sock.connect((whois_addr, 43))
-        whois_sock.send(addr.encode(encoding='utf-8') + b'\r\n')
-        data = bytearray()
-        while True:
-            temp_data = whois_sock.recv(1024)
-            if not temp_data:
-                break
-            data.extend(temp_data)
+
+    for field in ('netname', 'country', 'origin'):
         try:
-            data = data.decode()
-        except UnicodeDecodeError:
-            return {}
-        for field in ('netname', 'country', 'origin'):
-            try:
-                field_start = data.index(field)
-                field_end = data.index('\n', field_start)
-                key_value_data = data[field_start:field_end]
-                field_data = key_value_data.replace(' ', '').split(':')[1]
-                whois_data[field] = field_data
-            except ValueError:
-                continue
+            field_start = data.index(field)
+            field_end = data.index('\n', field_start)
+            key_value_data = data[field_start:field_end]
+            field_data = key_value_data.replace(' ', '').split(':')[1]
+            whois_data[field] = field_data
+        except ValueError:
+            continue
     return whois_data
 
 
@@ -158,12 +173,12 @@ def trace(address):
 
         sock_sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_ICMP)
         sock_sender.setsockopt(socket.IPPROTO_IP, socket.IP_TTL, struct.pack('I', ttl))
-        sock_sender.sendto(IcmpPacket(ICMP_ECHO_REQUEST, 0).__bytes__(), (address, 80))
+        sock_sender.sendto(IcmpPack(ICMP_ECHO_REQUEST, 0).__bytes__(), (address, 80))
 
         try:
             data, conn = sock_receiver.recvfrom(1024)
             whois_data = get_whois_data(conn[0])
-            icmp_response = IcmpPacket.from_bytes(data[20:])
+            icmp_response = IcmpPack.from_bytes(data[20:])
             trace_result = TraceResult.from_whois_data(conn[0], success_num, whois_data)
             success_num += 1
             yield trace_result
