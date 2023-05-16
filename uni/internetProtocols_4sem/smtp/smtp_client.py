@@ -119,7 +119,7 @@ class HideousClient:
                     self.send(sock, command)
                     self.receive(sock)
                     if 'DATA' in command:
-                        sock.send(self.create_mail().encode())
+                        self.send(sock, self.create_mail())
                         self.receive(sock)
 
             except SMTPException as e:

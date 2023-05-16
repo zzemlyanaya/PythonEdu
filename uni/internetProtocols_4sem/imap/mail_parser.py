@@ -4,8 +4,8 @@ import quopri
 from socket import timeout
 from typing import List
 
-from utils import IMAPException
-# from imap.utils import IMAPException
+# from utils import IMAPException
+from imap.utils import IMAPException
 
 
 class IMAParser:

@@ -30,5 +30,3 @@ if __name__ == '__main__':
         print('DNS Error')
     except ConnectionError:
         print('Connection error')
-
-#  python3 -m smtp -s smtp.yandex.ru:587 -f zemlyanayaek@ya.ru -t zemlyanayaek@ya.ru --verbose -d ./cats --auth --ssl

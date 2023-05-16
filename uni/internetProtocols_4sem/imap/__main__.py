@@ -1,7 +1,7 @@
 import socket
 from argparse import ArgumentParser
-# from imap.imap_client import HideousClient
-from imap_client import HideousClient
+from imap.imap_client import HideousClient
+# from imap_client import HideousClient
 
 
 def get_args():
@@ -33,6 +33,3 @@ if __name__ == '__main__':
         print('DNS Error')
     except ConnectionError:
         print('Connection error')
-
-# ehuuzkvdatkclvtd
-# python3 -m imap -u zemlyanayaek@ya.ru -s imap.yandex.ru:143 --ssl

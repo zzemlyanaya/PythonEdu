@@ -2,10 +2,10 @@ import base64
 
 import beautifultable
 from beautifultable import BeautifulTable
-# from imap.utils import IMAPException
-# from imap.mail_parser import IMAParser
-from utils import IMAPException
-from mail_parser import IMAParser
+from imap.utils import IMAPException
+from imap.mail_parser import IMAParser
+# from utils import IMAPException
+# from mail_parser import IMAParser
 from socket import AF_INET, SOCK_STREAM, gaierror, socket, timeout, error
 from ssl import wrap_socket
 from getpass import getpass
