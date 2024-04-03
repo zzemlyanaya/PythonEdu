@@ -1,75 +1,75 @@
-from collections import defaultdict
+from collections import deque
 
 
-class Graph:
+def find_max_flow(capacity, source, sink):
+    n = len(capacity)
 
-    def __init__(self, graph):
-        self.graph = graph
-        self. ROW = len(graph)
+    max_flow = 0
+    flow = [[0] * n for _ in range(n)]
+    residual_capacity = [row[:] for row in capacity]
+
+    while True:
+        pred = bfs(residual_capacity, flow, source, sink)
+        if pred[sink] == -1:
+            break
+
+        v = sink
+        bottleneck = float('+inf')
+        while v != source:
+            u = pred[v]
+            if residual_capacity[u][v] > 0: # если направление прямое
+                edge_capacity = residual_capacity[u][v]
+            else: # если обратное направление
+                edge_capacity = flow[v][u]
+            bottleneck = min(bottleneck, edge_capacity)
+            v = u
+
+        v = sink
+        while v != source:
+            u = pred[v]
+            if residual_capacity[u][v] > 0:
+                flow[u][v] += bottleneck
+                residual_capacity[u][v] -= bottleneck
+            else:
+                flow[v][u] -= bottleneck # отменяем поток, который идет не по пути цепи.
+                residual_capacity[u][v] += bottleneck
+            v = u
+
+        max_flow += bottleneck
+
+    return max_flow, flow
+
+def bfs(residual_capacity, flow, source, sink):
+    n = len(residual_capacity)
+    visited = [False] * n
+    pred = [-1] * n
+
+    visited[source] = True
+    queue = deque()
+    queue.append(source)
+
+    while queue:
+        u = queue.popleft()
+        for v in range(len(residual_capacity[u])):
+            if not visited[v] and (residual_capacity[u][v] or flow[v][u]):
+                visited[v] = True
+                pred[v] = u
+                if v == sink:
+                    return pred
+                queue.append(v)
+    return pred
 
 
-    # Using BFS as a searching algorithm
-    def searching_algo_BFS(self, s, t, parent):
-
-        visited = [False] * (self.ROW)
-        queue = []
-
-        queue.append(s)
-        visited[s] = True
-
-        while queue:
-
-            u = queue.pop(0)
-
-            for ind, val in enumerate(self.graph[u]):
-                if visited[ind] == False and val > 0:
-                    queue.append(ind)
-                    visited[ind] = True
-                    parent[ind] = u
-
-        return True if visited[t] else False
-
-    # Applying fordfulkerson algorithm
-    def ford_fulkerson(self, source, sink):
-        parent = [-1] * (self.ROW)
-        max_flow = 0
-
-        while self.searching_algo_BFS(source, sink, parent):
-
-            path_flow = float("Inf")
-            s = sink
-            while(s != source):
-                path_flow = min(path_flow, self.graph[parent[s]][s])
-                s = parent[s]
-
-            # Adding the path flows
-            max_flow += path_flow
-
-            # Updating the residual values of edges
-            v = sink
-            while(v != source):
-                u = parent[v]
-                self.graph[u][v] -= path_flow
-                self.graph[v][u] += path_flow
-                v = parent[v]
-
-        return self.graph, max_flow
+with open("in.txt", "r") as f:
+    n = int(f.readline())
+    capacity = [list(map(int, f.readline().split())) for _ in range(n)]
+    source = int(f.readline()) - 1
+    sink = int(f.readline()) - 1
 
 
-with open('in.txt', 'r') as file:
-    N = int(file.readline())
-    graph = []
-    for _ in range(N):
-        row = list(map(int, file.readline().split()))
-        graph.append(row)
-    source = int(file.readline()) - 1
-    target = int(file.readline()) - 1
+max_flow, flow = find_max_flow(capacity, source, sink)
 
-    g = Graph(graph)
-
-    max_flow = g.ford_fulkerson(source, target)
-
-    with open('out.txt', 'w') as out:
-        for row in g.graph:
-            out.write(' '.join(map(str, row)) + '\n')
-        out.write(str(max_flow))
+with open("out.txt", "w") as f:
+    for row in flow:
+        f.write(' '.join(map(str, row)) + '\n')
+    f.write(str(max_flow) + '\n')

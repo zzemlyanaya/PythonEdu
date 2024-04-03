@@ -1,31 +1,49 @@
-def dfs(C, F, s, t, n):
-    stack = [s]
+from collections import deque
+
+
+def bfs(C, F, s, t, n):
+    queue = deque([s])
     paths = {s: []}
-    if s == t:
-        return paths[s]
-    while stack:
-        u = stack.pop()
+
+    while queue:
+        u = queue.popleft()
+
+        if u == t:
+            return paths[u]
+
         for v in range(n):
             if (C[u][v] - F[u][v] > 0) and v not in paths:
                 paths[v] = paths[u] + [(u, v)]
-                if v == t:
-                    return paths[v]
-                stack.append(v)
+                queue.append(v)
+
     return None
 
 
 def max_flow(C, s, t, n):
     F = [[0] * n for _ in range(n)]
+    R = [row[:] for row in C]
     maxflow = 0
+    flow = float('+inf')
 
-    path = dfs(C, F, s, t, n)
+    path = bfs(R, F, s, t, n)
     while path is not None:
-        flow = min(C[u][v] - F[u][v] for u, v in path)
+        for u, v in path:
+            if R[u][v] > 0:
+                e = R[u][v]
+            else:
+                e = F[u][v]
+
+            flow = min(flow, e)
+
         maxflow += flow
         for u, v in path:
-            F[u][v] += flow
-            F[v][u] -= flow
-        path = dfs(C, F, s, t, n)
+            if R[u][v] > 0:
+                F[u][v] += flow
+                R[u][v] -= flow
+            else:
+                F[u][v] -= flow
+                R[u][v] += flow
+        path = bfs(C, F, s, t, n)
     return F, maxflow
 
 
