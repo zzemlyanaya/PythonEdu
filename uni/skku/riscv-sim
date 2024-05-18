@@ -1,1 +1,1 @@
-python3 riscv-sim.py "$@"
+python3 riscv-sim.py ${@}
