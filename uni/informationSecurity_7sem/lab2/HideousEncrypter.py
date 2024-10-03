@@ -17,12 +17,12 @@ class HideousEncrypter:
 
         self.original_file = './original/' + args.doc_name
         self.encoded_file = './encoded/encoded_' + args.doc_name
+        self.decode_file = './encoded/decode_file.docx'
         self.cypher_file = './original/cipher.txt'
 
     def work(self):
         with open(self.cypher_file, "r") as file:
             cipher = file.read().lower()
-        cipher = re.sub('[^\w\s]', '', cipher)
 
         doc = Document(self.original_file)
         paragraphs = doc.paragraphs
@@ -44,12 +44,9 @@ class HideousEncrypter:
             elif (upper != -1) and (lower == -1):
                 markers.append(upper)
             else:
-                if upper > lower:
-                    markers.append(lower)
-                    label = lower
-                elif upper < lower:
-                    markers.append(upper)
-                    label = upper
+                final = min(lower, upper)
+                markers.append(final)
+                label = final
 
         if -1 in markers:
             raise RuntimeError("Can't hide the message!")
@@ -65,3 +62,13 @@ class HideousEncrypter:
                 else:
                     paragraphs.add_run(text[markers[i]+1:markers[i+1]])
             encoded.save(self.encoded_file)
+
+    def decode(self):
+        doc = Document(self.decode_file)
+        paragraphs = doc.paragraphs
+        cipher = ''
+        for p in paragraphs:
+            for run in p.runs:
+                if run.font.size == Pt(11 * self.x):
+                    cipher += run.text
+        print(cipher)
